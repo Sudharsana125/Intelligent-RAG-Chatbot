@@ -4,27 +4,22 @@ multilingual.py
 Provides language detection so the chatbot can identify the language of an
 incoming user query and instruct the LLM to respond in the same language.
 
-Uses ``langdetect`` (a lightweight, offline-capable library) rather than a
-paid API, keeping multilingual support fast and free for a demo
-deployment. English, Tamil and Hindi are explicitly supported as
-first-class languages per the project requirements, with graceful fallback
-for any other language ``langdetect`` recognizes.
+Uses langdetect with robust heuristics for short/ASCII inputs to ensure reliable
+detection of English, Tamil, Hindi, and other languages without misclassifying
+common English queries into obscure language codes.
 """
 
+import re
 from typing import Optional
-
 from langdetect import DetectorFactory, LangDetectException, detect
-
 from src.utils import get_logger
 
 logger = get_logger(__name__)
 
-# Make language detection deterministic across runs (langdetect uses a
-# probabilistic algorithm seeded randomly by default).
+# Make language detection deterministic across runs
 DetectorFactory.seed = 0
 
-# Human-readable names for common language codes, prioritizing the
-# languages explicitly required by the project plus other major languages.
+# Human-readable names for ISO 639-1 language codes
 LANGUAGE_NAMES = {
     "en": "English",
     "ta": "Tamil",
@@ -41,15 +36,47 @@ LANGUAGE_NAMES = {
     "fr": "French",
     "de": "German",
     "zh-cn": "Chinese",
+    "zh-tw": "Chinese",
+    "zh": "Chinese",
     "ja": "Japanese",
     "ko": "Korean",
     "ar": "Arabic",
     "ru": "Russian",
     "pt": "Portuguese",
     "it": "Italian",
+    "nl": "Dutch",
+    "sv": "Swedish",
+    "da": "Danish",
+    "no": "Norwegian",
+    "fi": "Finnish",
+    "tl": "Tagalog",
+    "af": "Afrikaans",
+    "pl": "Polish",
+    "cs": "Czech",
+    "ro": "Romanian",
+    "hu": "Hungarian",
+    "tr": "Turkish",
+    "el": "Greek",
+    "th": "Thai",
+    "id": "Indonesian",
+    "vi": "Vietnamese",
+    "uk": "Ukrainian",
+    "sw": "Swahili",
 }
 
 DEFAULT_LANGUAGE_CODE = "en"
+
+# Common English indicator words for reliable detection of short Latin queries
+ENGLISH_INDICATORS = {
+    "what", "is", "your", "return", "policy", "how", "do", "i", "can", "you",
+    "the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "of", "with",
+    "about", "help", "contact", "support", "shipping", "refund", "track", "order",
+    "product", "catalog", "price", "cost", "available", "hello", "hi", "hey",
+    "thanks", "thank", "buy", "sell", "delivery", "item", "exchange", "warranty",
+    "cancel", "account", "login", "password", "reset", "pay", "payment", "card",
+    "where", "when", "why", "who", "which", "are", "there", "have", "has", "had",
+    "will", "would", "could", "should", "tell", "me", "please", "service", "options"
+}
 
 
 class LanguageDetector:
@@ -60,21 +87,24 @@ class LanguageDetector:
 
     def detect_language(self, text: str) -> str:
         """
-        Detect the ISO 639-1 language code of the given text.
-
-        Args:
-            text: Input text (typically a user query).
-
-        Returns:
-            ISO language code (e.g. ``"en"``, ``"ta"``, ``"hi"``). Falls
-            back to ``DEFAULT_LANGUAGE_CODE`` if detection fails or the
-            text is too short to reliably classify.
+        Detect the ISO 639-1 language code of the given text with robust fallback.
         """
         if not text or len(text.strip()) < 2:
             return DEFAULT_LANGUAGE_CODE
 
+        clean_text = text.strip()
+
+        # Check if text contains non-ASCII characters (e.g. Tamil, Hindi, Chinese, Arabic)
+        has_non_ascii = any(ord(char) > 127 for char in clean_text)
+
+        if not has_non_ascii:
+            # Check for English indicators in ASCII text
+            words = set(re.findall(r'\b[a-zA-Z]+\b', clean_text.lower()))
+            if words.intersection(ENGLISH_INDICATORS) or len(clean_text) < 40:
+                return DEFAULT_LANGUAGE_CODE
+
         try:
-            code = detect(text)
+            code = detect(clean_text)
             return code
         except LangDetectException:
             logger.warning("Language detection failed; defaulting to English.")
@@ -83,24 +113,13 @@ class LanguageDetector:
     def get_language_name(self, language_code: str) -> str:
         """
         Convert a language code into a human-readable name.
-
-        Args:
-            language_code: ISO language code.
-
-        Returns:
-            Human-readable language name, or the code itself if unknown.
         """
-        return LANGUAGE_NAMES.get(language_code, language_code)
+        code = (language_code or DEFAULT_LANGUAGE_CODE).lower()
+        return LANGUAGE_NAMES.get(code, code.upper())
 
     def detect_with_name(self, text: str) -> tuple:
         """
         Detect language and return both the code and human-readable name.
-
-        Args:
-            text: Input text to analyze.
-
-        Returns:
-            Tuple of ``(language_code, language_name)``.
         """
         code = self.detect_language(text)
         name = self.get_language_name(code)
@@ -110,12 +129,6 @@ class LanguageDetector:
         """
         Build a natural-language instruction for the LLM directing it to
         respond in the detected language.
-
-        Args:
-            language_code: ISO language code detected from the user query.
-
-        Returns:
-            Instruction string to append to the system prompt.
         """
         language_name = self.get_language_name(language_code)
         if language_code == DEFAULT_LANGUAGE_CODE:

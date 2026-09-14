@@ -159,7 +159,11 @@ def analytics():
     dn = a["feedback_down"]
     sat = round((up / max(up + dn, 1)) * 100)
 
-    lang_counter = Counter(a["languages"])
+    # Clean up language names
+    from src.multilingual import LANGUAGE_NAMES
+    clean_langs = [LANGUAGE_NAMES.get(l.lower(), l.capitalize()) for l in a["languages"]]
+
+    lang_counter = Counter(clean_langs)
     topic_counter = Counter(a["topics"])
 
     return jsonify({

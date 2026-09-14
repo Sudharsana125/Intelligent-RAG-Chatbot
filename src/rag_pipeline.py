@@ -61,7 +61,7 @@ class RAGPipeline:
         default_models = {
             "openai": "gpt-4o",
             "anthropic": "claude-sonnet-4-5",
-            "gemini": "gemini-2.5-flash",
+            "gemini": "gemini-3.5-flash",
         }
         self.model_name = model_name or default_models[self.provider]
         self._client = self._init_client()
@@ -158,23 +158,30 @@ class RAGPipeline:
 
         full_prompt = f"{system_prompt}\n\n{history_text}Customer: {query}\nAssistant:"
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={api_key}"
-        payload = {
-            "contents": [{"parts": [{"text": full_prompt}]}],
-            "generationConfig": {
-                "temperature": self.temperature,
-                "maxOutputTokens": 800,
-                "thinkingConfig": {"thinkingBudget": 0},
+        candidate_models = [self.model_name]
+        for fallback in ["gemini-3.5-flash", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"]:
+            if fallback not in candidate_models:
+                candidate_models.append(fallback)
+
+        last_error = None
+        for model in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            payload = {
+                "contents": [{"parts": [{"text": full_prompt}]}],
+                "generationConfig": {
+                    "temperature": self.temperature,
+                    "maxOutputTokens": 1500,
+                }
             }
-        }
+            try:
+                response = requests.post(url, json=payload, timeout=30)
+                if response.status_code == 200:
+                    result = response.json()
+                    return result["candidates"][0]["content"]["parts"][0]["text"]
+                logger.warning("Gemini model %s returned status %d: %s. Trying next model...", model, response.status_code, response.text[:200])
+                last_error = f"Gemini API error {response.status_code}: {response.text}"
+            except Exception as e:
+                logger.warning("Gemini model %s failed with exception: %s. Trying next model...", model, e)
+                last_error = str(e)
 
-        response = requests.post(url, json=payload, timeout=120)
-
-        if response.status_code != 200:
-            raise LLMProviderError(f"Gemini API error {response.status_code}: {response.text}")
-
-        result = response.json()
-        try:
-            return result["candidates"][0]["content"]["parts"][0]["text"]
-        except (KeyError, IndexError) as e:
-            raise LLMProviderError(f"Unexpected Gemini response: {result}") from e
+        raise LLMProviderError(f"All Gemini models failed. Last error: {last_error}")
