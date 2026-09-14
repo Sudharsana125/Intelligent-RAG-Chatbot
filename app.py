@@ -218,7 +218,7 @@ def render_sidebar(chatbot):
 
         st.divider()
         st.markdown('<div style="color:#1e293b;font-size:.68em;letter-spacing:2px;margin-bottom:7px;font-weight:600;">KNOWLEDGE BASE</div>',unsafe_allow_html=True)
-        up=st.file_uploader("",type=["pdf","txt","docx"],accept_multiple_files=True,label_visibility="collapsed")
+        up=st.file_uploader("Upload documents",type=["pdf","txt","docx"],accept_multiple_files=True,label_visibility="collapsed")
         if up:
             if st.button("📥 Index Now",use_container_width=True):
                 p=st.progress(0)

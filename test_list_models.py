@@ -8,7 +8,6 @@ api_key = os.getenv("GEMINI_API_KEY")
 url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
 res = requests.get(url)
 models = res.json()
-print("Supported models for embedContent:")
+print("All models:")
 for m in models.get("models", []):
-    if "embedContent" in m.get("supportedGenerationMethods", []):
-        print(m["name"])
+    print(f"{m['name']}: {m.get('supportedGenerationMethods', [])}")
