@@ -1,4 +1,4 @@
-# 🤖 Intelligent RAG Customer Support Chatbot
+# Intelligent RAG Customer Support Chatbot
 
 A modern **AI-powered customer support platform** built using **Retrieval-Augmented Generation (RAG)** and the **Google Gemini API**.
 
@@ -6,7 +6,7 @@ The system allows users to upload company documents and ask questions based on t
 
 ---
 
-## ✨ Features
+# Features
 
 - 📄 Upload PDF, DOCX, and TXT documents
 - 🧠 Retrieval-Augmented Generation (RAG)
@@ -22,9 +22,9 @@ The system allows users to upload company documents and ask questions based on t
 
 ---
 
-## 📸 Application Screenshots
+## Application Screenshots
 
-### 🚀 Landing Page
+### Landing Page
 
 Modern landing page introducing the AI-powered customer support platform.
 
@@ -32,7 +32,7 @@ Modern landing page introducing the AI-powered customer support platform.
 
 ---
 
-### 💬 AI Support Workspace
+### AI Support Workspace
 
 The main workspace provides suggested questions, document management, and an interactive chatbot interface.
 
@@ -40,7 +40,7 @@ The main workspace provides suggested questions, document management, and an int
 
 ---
 
-### 📄 Document Upload
+### Document Upload
 
 Users can upload company documents such as **PDF, DOCX, and TXT** files to build the knowledge base.
 
@@ -48,7 +48,7 @@ Users can upload company documents such as **PDF, DOCX, and TXT** files to build
 
 ---
 
-### 🤖 RAG Chat Response
+### RAG Chat Response
 
 The chatbot retrieves relevant information from uploaded documents and uses **Google Gemini** to generate context-aware responses.
 
@@ -56,7 +56,7 @@ The chatbot retrieves relevant information from uploaded documents and uses **Go
 
 ---
 
-### 📊 Analytics Dashboard
+### Analytics Dashboard
 
 The analytics dashboard provides insights into chatbot usage, response time, sessions, and language distribution.
 
@@ -64,7 +64,7 @@ The analytics dashboard provides insights into chatbot usage, response time, ses
 
 ---
 
-### 🕘 Conversation History
+### Conversation History
 
 Previous conversations can be saved, viewed, and restored from the history dashboard.
 
@@ -72,7 +72,7 @@ Previous conversations can be saved, viewed, and restored from the history dashb
 
 ---
 
-## 🧠 How RAG Works
+## How RAG Works
 
 ```text
 User Question
@@ -96,7 +96,7 @@ Context-Aware Response
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Technology | Purpose |
 |---|---|
@@ -149,7 +149,7 @@ Intelligent-RAG-Chatbot/
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### 1. Clone the Repository
 
@@ -194,17 +194,6 @@ Create a `.env` file in the root directory:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
-
-> ⚠️ Never upload your actual Gemini API key to GitHub.
-
-Make sure `.env` is included in `.gitignore`:
-
-```gitignore
-.env
-venv/
-__pycache__/
-```
-
 ---
 
 ## ▶️ Run the Project
@@ -241,7 +230,7 @@ Open the local URL displayed by Vite in your browser.
 
 ---
 
-## 💬 Example Questions
+## Example Questions
 
 ```text
 What is your return policy?
@@ -272,7 +261,7 @@ The application includes an analytics dashboard for monitoring:
 
 ---
 
-## 🕘 Conversation History
+## Conversation History
 
 Conversation history allows users to:
 
@@ -284,7 +273,7 @@ Conversation history allows users to:
 
 ---
 
-## 🎯 Project Goal
+## Project Goal
 
 The goal of this project is to build a practical **AI customer support system** that combines **RAG, Generative AI, semantic search, document processing, conversation history, and analytics** in a single application.
 
@@ -316,9 +305,5 @@ AI & Data Science Project
 
 Built with **Google Gemini + RAG + ChromaDB + React + Flask**
 
-Project goal 
-
 Built to provide reliable, document-grounded customer support using RAG.
 ---
-
-⭐ If you find this project useful, consider giving the repository a star.
