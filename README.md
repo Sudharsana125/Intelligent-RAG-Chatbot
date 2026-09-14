@@ -320,5 +320,3 @@ Project goal
 
 Built to provide reliable, document-grounded customer support using RAG.
 ---
-
-⭐ If you find this project useful, consider giving the repository a star.
