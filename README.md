@@ -279,31 +279,3 @@ The goal of this project is to build a practical **AI customer support system** 
 
 Instead of relying only on the LLM's general knowledge, the chatbot retrieves information from uploaded company documents before generating its response.
 
----
-
-## 🔐 Security
-
-API keys should never be committed directly to the repository.
-
-Use environment variables:
-
-```env
-GEMINI_API_KEY=your_api_key
-```
-
-and keep the `.env` file excluded through `.gitignore`.
-
----
-
-## 👨‍💻 Author
-
-**Sudharsana**
-
-AI & Data Science Project
-
-**Intelligent RAG Customer Support Chatbot**
-
-Built with **Google Gemini + RAG + ChromaDB + React + Flask**
-
-Built to provide reliable, document-grounded customer support using RAG.
----
