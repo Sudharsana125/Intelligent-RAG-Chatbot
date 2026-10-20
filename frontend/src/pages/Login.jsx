@@ -84,14 +84,6 @@ export default function Login({ onLogin }) {
     }
   }
 
-  const fillCredentials = (demoEmail, demoPassword) => {
-    setMode('login')
-    setEmail(demoEmail)
-    setPassword(demoPassword)
-    setError('')
-    setSuccessMsg('')
-  }
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -549,89 +541,6 @@ export default function Login({ onLogin }) {
             )}
           </motion.button>
         </form>
-
-        {/* Demo Accounts */}
-        <div style={{
-          marginTop: 24,
-          paddingTop: 18,
-          borderTop: '1px solid rgba(255, 255, 255, 0.07)'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            fontSize: '0.74rem',
-            color: 'var(--text-dim)',
-            textTransform: 'uppercase',
-            letterSpacing: 1.5,
-            marginBottom: 10
-          }}>
-            <Zap size={13} color="var(--cyan)" /> Or 1-Click Fast Fill Test Accounts
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.02, borderColor: 'var(--cyan)' }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => fillCredentials('customer@support.ai', 'customer123')}
-              style={{
-                background: 'rgba(0, 255, 247, 0.05)',
-                border: '1px solid rgba(0, 255, 247, 0.2)',
-                borderRadius: 10,
-                padding: '8px 8px',
-                color: 'var(--text-primary)',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              <div style={{ fontWeight: 600, color: 'var(--cyan)' }}>✨ Customer</div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.66rem' }}>customer123</div>
-            </motion.button>
-
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.02, borderColor: 'var(--purple)' }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => fillCredentials('agent@support.ai', 'agent123')}
-              style={{
-                background: 'rgba(191, 0, 255, 0.05)',
-                border: '1px solid rgba(191, 0, 255, 0.2)',
-                borderRadius: 10,
-                padding: '8px 8px',
-                color: 'var(--text-primary)',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              <div style={{ fontWeight: 600, color: '#d980ff' }}>🛡️ Support Agent</div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.66rem' }}>agent123</div>
-            </motion.button>
-
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.02, borderColor: '#00ff88' }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => fillCredentials('admin@support.ai', 'admin123')}
-              style={{
-                background: 'rgba(0, 255, 136, 0.05)',
-                border: '1px solid rgba(0, 255, 136, 0.2)',
-                borderRadius: 10,
-                padding: '8px 8px',
-                color: 'var(--text-primary)',
-                fontSize: '0.74rem',
-                cursor: 'pointer',
-                textAlign: 'left'
-              }}
-            >
-              <div style={{ fontWeight: 600, color: '#00ff88' }}>⚡ Admin Lead</div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '0.66rem' }}>admin123</div>
-            </motion.button>
-          </div>
-        </div>
 
       </motion.div>
     </div>
