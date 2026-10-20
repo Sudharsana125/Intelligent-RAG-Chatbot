@@ -23,7 +23,8 @@ from src.utils import get_logger
 logger = get_logger(__name__)
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173", "http://localhost:3000"])
+# Allow any localhost port so Vite's auto-fallback ports (5173, 5174, 3000, etc.) all work
+CORS(app, origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"])
 
 # ── Shared state (session-level, single-user dev server) ──────────────────
 _chatbot = None
