@@ -61,9 +61,16 @@ export default function UserPortal() {
     setTyping(true)
 
     try {
+      const savedAuth = localStorage.getItem('auth_user') || sessionStorage.getItem('auth_user')
+      let token = ''
+      try { token = savedAuth ? JSON.parse(savedAuth).token : '' } catch (_) {}
+
       const r = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ message: msg }),
       })
       const d = await r.json()
@@ -220,7 +227,7 @@ export default function UserPortal() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.1, type: 'spring' }}
-                    whileHover={{ scale: 1.05, y: -4, boxShadow: '0 10px 20px rgba(0,255,247,0.1)' }}
+                    whileHover={{ scale: 1.05, y: -4, boxShadow: '0 10px 20px rgba(0,255,247,0.1)', borderColor: 'rgba(0,255,247,0.4)' }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => sendMessage(s)}
                     style={{
@@ -236,8 +243,6 @@ export default function UserPortal() {
                       gap: 8,
                       transition: 'border-color 0.2s'
                     }}
-                    onHoverStart={(e) => e.currentTarget.style.borderColor = 'rgba(0,255,247,0.4)'}
-                    onHoverEnd={(e) => e.currentTarget.style.borderColor = 'rgba(0,255,247,0.15)'}
                   >
                     <MessageCircleQuestion size={16} /> {s}
                   </motion.button>
