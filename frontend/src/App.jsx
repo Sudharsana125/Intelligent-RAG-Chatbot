@@ -1,6 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { AnimatePresence } from 'framer-motion'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
 import Landing from './pages/Landing'
@@ -8,6 +7,22 @@ import UserPortal from './pages/UserPortal'
 import AnalyticsDashboard from './pages/AnalyticsDashboard'
 import History from './pages/History'
 import ParticleBackground from './components/ParticleBackground'
+
+// Stable routes component — NO AnimatePresence here.
+// Each page handles its own entrance animation via motion.div PAGE_VARIANTS.
+// AnimatePresence around Routes causes the active page to unmount/remount
+// on every parent state update (e.g. fetchStatus polling), which wipes
+// UserPortal's messages state while an API call is in progress.
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/chat" replace />} />
+      <Route path="/chat" element={<UserPortal />} />
+      <Route path="/analytics" element={<AnalyticsDashboard />} />
+      <Route path="/history" element={<History />} />
+    </Routes>
+  )
+}
 
 export default function App() {
   const [launched, setLaunched] = useState(false)
@@ -56,17 +71,11 @@ export default function App() {
             onStatusRefresh={fetchStatus}
           />
           <main className={`page-content ${sidebarOpen ? 'with-sidebar' : ''}`}>
-            <AnimatePresence mode="wait">
-              <Routes>
-                <Route path="/" element={<Navigate to="/chat" replace />} />
-                <Route path="/chat" element={<UserPortal />} />
-                <Route path="/analytics" element={<AnalyticsDashboard />} />
-                <Route path="/history" element={<History />} />
-              </Routes>
-            </AnimatePresence>
+            <AppRoutes kbStatus={kbStatus} onStatusRefresh={fetchStatus} />
           </main>
         </div>
       </div>
     </BrowserRouter>
   )
 }
+
