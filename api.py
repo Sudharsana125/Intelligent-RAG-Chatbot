@@ -6,7 +6,7 @@ Chatbot class as REST endpoints consumed by the React frontend.
 Run: python api.py
 Runs on: http://localhost:5000
 """
-import sys, time, datetime
+import os, sys, time, datetime
 from pathlib import Path
 from collections import Counter
 from flask import Flask, request, jsonify
@@ -26,8 +26,8 @@ logger = get_logger(__name__)
 auth.init_auth_db()
 
 app = Flask(__name__)
-# Allow any localhost port so Vite's auto-fallback ports (5173, 5174, 3000, etc.) all work
-CORS(app, origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"])
+# Allow CORS for localhost dev and production Vercel frontend
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # ── Shared state (session-level, single-user dev server) ──────────────────
 _chatbot = None
@@ -364,6 +364,6 @@ def auth_logout():
 
 
 if __name__ == "__main__":
-    print("Starting Flask API on http://localhost:5000")
-    print("React frontend should run on http://localhost:5173")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Starting Flask API on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
