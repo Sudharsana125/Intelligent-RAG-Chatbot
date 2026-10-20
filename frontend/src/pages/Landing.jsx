@@ -384,12 +384,6 @@ export default function Landing({ onLaunch, user, onLogout }) {
               <LogIn size={18} />
               {user ? 'Enter Workspace' : 'Sign In to Workspace'}
             </motion.button>
-
-            {!user && (
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
-                Demo credentials available on login
-              </span>
-            )}
           </motion.div>
         </div>
 
