@@ -20,7 +20,10 @@ load_dotenv()
 
 from src.chatbot import Chatbot
 from src.utils import get_logger
+import src.auth as auth
 logger = get_logger(__name__)
+
+auth.init_auth_db()
 
 app = Flask(__name__)
 # Allow any localhost port so Vite's auto-fallback ports (5173, 5174, 3000, etc.) all work
@@ -73,6 +76,14 @@ def status():
 @app.route("/api/chat", methods=["POST"])
 def chat():
     global _analytics, _messages
+    
+    # Strict Authentication Enforcement
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "").strip() if auth_header else ""
+    user = auth.verify_token(token)
+    if not user:
+        return jsonify({"ok": False, "error": "Unauthorized. You must be authenticated to use the AI workspace."}), 401
+
     data = request.get_json(force=True)
     text = (data.get("message") or "").strip()
     if not text:
@@ -273,6 +284,81 @@ def reset_kb():
         chatbot = get_chatbot()
         chatbot.clear_knowledge_base()
         return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REAL AUTHENTICATION (SQLite + PBKDF2 Password Hashing + Session Tokens)
+# ─────────────────────────────────────────────────────────────────────────────
+@app.route("/api/auth/register", methods=["POST"])
+def auth_register():
+    try:
+        data = request.get_json(force=True) or {}
+        name = data.get("name", "")
+        email = data.get("email", "")
+        password = data.get("password", "")
+        role = data.get("role", "Customer")
+
+        ok, msg, user, token = auth.register_user(name, email, password, role)
+        if not ok:
+            return jsonify({"ok": False, "error": msg}), 400
+
+        return jsonify({
+            "ok": True,
+            "message": msg,
+            "user": user,
+            "token": token
+        }), 201
+    except Exception as e:
+        logger.error(f"Registration error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/auth/login", methods=["POST"])
+@app.route("/api/login", methods=["POST"])
+def auth_login():
+    try:
+        data = request.get_json(force=True) or {}
+        email = data.get("email", "")
+        password = data.get("password", "")
+
+        ok, msg, user, token = auth.login_user(email, password)
+        if not ok:
+            return jsonify({"ok": False, "error": msg}), 401
+
+        return jsonify({
+            "ok": True,
+            "message": msg,
+            "user": user,
+            "token": token
+        })
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/auth/me", methods=["GET"])
+def auth_me():
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.replace("Bearer ", "").strip() if auth_header else ""
+        user = auth.verify_token(token)
+        if not user:
+            return jsonify({"ok": False, "error": "Invalid or expired session token."}), 401
+
+        return jsonify({"ok": True, "user": user})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def auth_logout():
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.replace("Bearer ", "").strip() if auth_header else ""
+        auth.logout_user(token)
+        return jsonify({"ok": True, "message": "Logged out successfully."})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 

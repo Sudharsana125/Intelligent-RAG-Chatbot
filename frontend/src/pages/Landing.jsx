@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
-import { Zap, Brain, Globe, BarChart2, Database, Sparkles, Send, Bot, User, FileText, Search, MessageSquare, CheckCircle } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Zap, Brain, Globe, BarChart2, Database, Sparkles, Send, Bot, User, FileText, Search, MessageSquare, CheckCircle, LogIn } from 'lucide-react'
 
 const FEATURES = [
   { icon: Brain, title: 'Context-Aware RAG', desc: 'Retrieves highly relevant chunks from your documents to generate precise answers.' },
@@ -186,7 +187,7 @@ function MockChatInterface() {
   )
 }
 
-export default function Landing({ onLaunch }) {
+export default function Landing({ onLaunch, user, onLogout }) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
@@ -203,6 +204,86 @@ export default function Landing({ onLaunch }) {
       position: 'relative',
       overflow: 'hidden',
     }}>
+      {/* Top Header Navigation */}
+      <header style={{
+        padding: '24px 40px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        zIndex: 10,
+        maxWidth: 1200,
+        margin: '0 auto',
+        width: '100%'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 32, height: 32,
+            background: 'linear-gradient(135deg, var(--cyan), var(--purple))',
+            borderRadius: '10px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Zap size={16} color="#000" fill="#000" />
+          </div>
+          <div>
+            <div style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '0.85rem', fontWeight: 700,
+              background: 'linear-gradient(90deg, var(--cyan), var(--purple))',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+              letterSpacing: 2,
+            }}>AI SUPPORT</div>
+            <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)', letterSpacing: 1 }}>CONTROL CENTER</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {user ? (
+            <>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onLaunch}
+                className="btn btn-secondary btn-sm"
+                style={{ borderRadius: 20, padding: '8px 18px', gap: 8, fontSize: '0.84rem' }}
+              >
+                <span>{user.avatar || '⚡'}</span> {user.name} &bull; Open Workspace
+              </motion.button>
+              {onLogout && (
+                <motion.button
+                  whileHover={{ scale: 1.05, color: '#ff4466' }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={onLogout}
+                  className="btn btn-ghost btn-sm"
+                  style={{ borderRadius: 20, padding: '8px 14px', fontSize: '0.8rem', color: 'var(--text-dim)' }}
+                  title="Sign Out"
+                >
+                  Sign Out
+                </motion.button>
+              )}
+            </>
+          ) : (
+            <Link to="/login" style={{ textDecoration: 'none' }}>
+              <motion.button
+                whileHover={{ scale: 1.05, borderColor: 'var(--cyan)', boxShadow: '0 0 20px rgba(0,255,247,0.3)' }}
+                whileTap={{ scale: 0.95 }}
+                className="btn btn-primary btn-sm"
+                style={{
+                  borderRadius: 20,
+                  padding: '9px 22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: '0.88rem',
+                  fontWeight: 600
+                }}
+              >
+                <LogIn size={16} /> Sign In
+              </motion.button>
+            </Link>
+          )}
+        </div>
+      </header>
+
       {/* Dynamic ambient glow tracking mouse */}
       <motion.div
         animate={{
@@ -291,17 +372,24 @@ export default function Landing({ onLaunch }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}
           >
             <motion.button
-              onClick={onLaunch}
+              onClick={() => onLaunch ? onLaunch() : null}
               className="btn btn-primary"
               whileHover={{ scale: 1.05, boxShadow: '0 0 30px rgba(0,255,247,0.4)' }}
               whileTap={{ scale: 0.95 }}
-              style={{ fontSize: '1.05rem', padding: '18px 48px', gap: 10, borderRadius: 30 }}
+              style={{ fontSize: '1.05rem', padding: '16px 42px', gap: 10, borderRadius: 30 }}
             >
-              Enter Workspace
-              <Zap size={18} fill="currentColor" />
+              <LogIn size={18} />
+              {user ? 'Enter Workspace' : 'Sign In to Workspace'}
             </motion.button>
+
+            {!user && (
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
+                Demo credentials available on login
+              </span>
+            )}
           </motion.div>
         </div>
 

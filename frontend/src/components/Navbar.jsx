@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MessageSquare, BarChart2, Clock, Home, Menu, X, Zap } from 'lucide-react'
+import { MessageSquare, BarChart2, Clock, Home, Menu, X, Zap, LogOut, User } from 'lucide-react'
 
 const NAV_ITEMS = [
   { to: '/chat', icon: MessageSquare, label: 'User Portal' },
@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { to: '/history', icon: Clock, label: 'History' },
 ]
 
-export default function Navbar({ sidebarOpen, onToggleSidebar, kbStatus, onHome }) {
+export default function Navbar({ sidebarOpen, onToggleSidebar, kbStatus, onHome, user, onLogout }) {
   const location = useLocation()
 
   return (
@@ -130,6 +130,58 @@ export default function Navbar({ sidebarOpen, onToggleSidebar, kbStatus, onHome 
         </span>
       </motion.div>
 
+      {/* User Profile & Logout */}
+      {user && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: 'var(--radius-full)',
+          padding: '4px 12px 4px 6px',
+          flexShrink: 0
+        }}>
+          <div style={{
+            width: 26,
+            height: 26,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, var(--cyan), var(--purple))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.78rem'
+          }}>
+            {user.avatar || '⚡'}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+            <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#fff' }}>{user.name}</span>
+            <span style={{ fontSize: '0.62rem', color: 'var(--cyan)' }}>{user.role || 'Agent'}</span>
+          </div>
+
+          {onLogout && (
+            <motion.button
+              whileHover={{ scale: 1.15, color: '#ff4466' }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onLogout}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-dim)',
+                cursor: 'pointer',
+                padding: '2px 4px',
+                marginLeft: 4,
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              title="Sign Out"
+            >
+              <LogOut size={13} />
+            </motion.button>
+          )}
+        </div>
+      )}
+
       {/* Home button */}
       <motion.button
         whileHover={{ scale: 1.05 }}
@@ -137,7 +189,7 @@ export default function Navbar({ sidebarOpen, onToggleSidebar, kbStatus, onHome 
         onClick={onHome}
         className="btn btn-ghost btn-sm"
         style={{ flexShrink: 0 }}
-        title="Back to Home"
+        title="Back to Landing Page"
       >
         <Home size={14} />
       </motion.button>
