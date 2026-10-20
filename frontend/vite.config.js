@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    strictPort: false, // allow fallback to 5174, 5175... if 5173 is busy
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
@@ -13,3 +14,4 @@ export default defineConfig({
     },
   },
 })
+
