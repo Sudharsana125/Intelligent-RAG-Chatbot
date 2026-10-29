@@ -14,6 +14,11 @@ env/
 data/vector_db/*
 !data/vector_db/.gitkeep
 
+# User database (SQLite)
+data/users.db
+*.db
+*.sqlite3
+
 # Streamlit
 .streamlit/secrets.toml
 

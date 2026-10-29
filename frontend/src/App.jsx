@@ -8,9 +8,10 @@ import UserPortal from './pages/UserPortal'
 import AnalyticsDashboard from './pages/AnalyticsDashboard'
 import History from './pages/History'
 import ParticleBackground from './components/ParticleBackground'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
 // Layout wrapper for authenticated workspace views
-function DashboardLayout({ user, onLogout, kbStatus, fetchStatus, sidebarOpen, setSidebarOpen }) {
+function DashboardLayout({ kbStatus, fetchStatus, sidebarOpen, setSidebarOpen }) {
   const navigate = useNavigate()
 
   return (
@@ -20,8 +21,6 @@ function DashboardLayout({ user, onLogout, kbStatus, fetchStatus, sidebarOpen, s
         onToggleSidebar={() => setSidebarOpen(o => !o)}
         kbStatus={kbStatus}
         onHome={() => navigate('/')}
-        user={user}
-        onLogout={onLogout}
       />
       <div className="app-main">
         <Sidebar
@@ -38,14 +37,7 @@ function DashboardLayout({ user, onLogout, kbStatus, fetchStatus, sidebarOpen, s
 }
 
 function AppContent() {
-  const [user, setUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('auth_user') || sessionStorage.getItem('auth_user')
-      return saved ? JSON.parse(saved) : null
-    } catch (_) {
-      return null
-    }
-  })
+  const { user, isAuthenticated, isLoading, logout } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [kbStatus, setKbStatus] = useState({ online: false, chunks: 0, sources: [] })
   const navigate = useNavigate()
@@ -60,22 +52,6 @@ function AppContent() {
   }
 
   useEffect(() => {
-    // Validate session token with server on initial mount
-    if (user && user.token) {
-      fetch('/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${user.token}` }
-      })
-      .then(r => r.json())
-      .then(d => {
-        if (!d.ok) {
-          handleLogout()
-        }
-      })
-      .catch(() => {})
-    }
-  }, [])
-
-  useEffect(() => {
     const isDashboard = ['/chat', '/analytics', '/history'].some(p => location.pathname.startsWith(p))
     if (isDashboard) {
       fetchStatus()
@@ -84,33 +60,23 @@ function AppContent() {
     }
   }, [location.pathname])
 
-  const handleLogin = (userData, remember = true) => {
-    setUser(userData)
-    try {
-      if (remember) {
-        localStorage.setItem('auth_user', JSON.stringify(userData))
-      } else {
-        sessionStorage.setItem('auth_user', JSON.stringify(userData))
-      }
-    } catch (_) {}
-  }
-
-  const handleLogout = () => {
-    const token = user?.token
-    setUser(null)
-    try {
-      localStorage.removeItem('auth_user')
-      sessionStorage.removeItem('auth_user')
-    } catch (_) {}
-
-    if (token) {
-      fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      }).catch(() => {})
-    }
-
-    navigate('/login')
+  if (isLoading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: 16,
+        background: '#020209'
+      }}>
+        <div className="spinner spinner-lg" />
+        <div style={{ color: 'var(--cyan)', fontFamily: 'var(--font-display)', letterSpacing: 2, fontSize: '0.82rem' }}>
+          VERIFYING SESSION...
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -124,7 +90,7 @@ function AppContent() {
             <Landing
               user={user}
               onLaunch={() => navigate(user ? '/chat' : '/login')}
-              onLogout={handleLogout}
+              onLogout={logout}
             />
           }
         />
@@ -133,17 +99,15 @@ function AppContent() {
         <Route
           path="/login"
           element={
-            user ? <Navigate to="/chat" replace /> : <Login onLogin={handleLogin} />
+            isAuthenticated ? <Navigate to="/chat" replace /> : <Login />
           }
         />
 
         {/* Authenticated Workspace Routes */}
         <Route
           element={
-            user ? (
+            isAuthenticated ? (
               <DashboardLayout
-                user={user}
-                onLogout={handleLogout}
                 kbStatus={kbStatus}
                 fetchStatus={fetchStatus}
                 sidebarOpen={sidebarOpen}
@@ -169,7 +133,9 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </BrowserRouter>
   )
 }

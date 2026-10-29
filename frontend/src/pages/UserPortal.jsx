@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Trash2, MessageSquare, Mic, Sparkles, Paperclip, MessageCircleQuestion } from 'lucide-react'
+import { Send, Trash2, MessageSquare, Mic, Sparkles, Paperclip, PlusCircle } from 'lucide-react'
 import { UserBubble, BotBubble, TypingIndicator } from '../components/ChatBubble'
+import { useAuth } from '../context/AuthContext'
 
 const SUGGESTED = [
   'What is your return policy?',
@@ -19,13 +21,13 @@ const PAGE_VARIANTS = {
 }
 
 export default function UserPortal() {
-  // Initialize from sessionStorage so messages survive any accidental remount
-  const [messages, setMessages] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem('chat_messages')
-      return saved ? JSON.parse(saved) : []
-    } catch { return [] }
+  const { apiFetch, user } = useAuth()
+  const location = useLocation()
+
+  const [conversationId, setConversationId] = useState(() => {
+    return location.state?.conversationId || null
   })
+  const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [typing, setTyping] = useState(false)
   const [feedbacks, setFeedbacks] = useState({})
@@ -33,20 +35,21 @@ export default function UserPortal() {
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Sync messages to sessionStorage on every change
+  // Fetch messages for active conversation or restore from location state
   useEffect(() => {
-    try { sessionStorage.setItem('chat_messages', JSON.stringify(messages)) } catch {}
-  }, [messages])
+    const targetConvId = location.state?.conversationId || conversationId
+    const query = targetConvId ? `?conversation_id=${encodeURIComponent(targetConvId)}` : ''
 
-  // Only load from server if sessionStorage is empty (first visit)
-  useEffect(() => {
-    const saved = sessionStorage.getItem('chat_messages')
-    if (!saved || saved === '[]') {
-      fetch('/api/messages').then(r => r.json()).then(d => {
-        if (d.ok && d.messages.length) setMessages(d.messages)
-      }).catch(() => {})
-    }
-  }, [])
+    apiFetch(`/api/messages${query}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          setMessages(d.messages || [])
+          if (d.conversation_id) setConversationId(d.conversation_id)
+        }
+      })
+      .catch(() => {})
+  }, [location.state?.conversationId, apiFetch])
 
   // Auto-scroll
   useEffect(() => {
@@ -61,21 +64,18 @@ export default function UserPortal() {
     setTyping(true)
 
     try {
-      const savedAuth = localStorage.getItem('auth_user') || sessionStorage.getItem('auth_user')
-      let token = ''
-      try { token = savedAuth ? JSON.parse(savedAuth).token : '' } catch (_) {}
-
-      const r = await fetch('/api/chat', {
+      const res = await apiFetch('/api/chat', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ message: msg }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: msg,
+          conversation_id: conversationId
+        }),
       })
-      const d = await r.json()
+      const d = await res.json()
       if (d.ok) {
         setMessages(prev => [...prev, d.message])
+        if (d.conversation_id) setConversationId(d.conversation_id)
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant', content: `Error: ${d.error || 'Something went wrong.'}`,
@@ -84,7 +84,7 @@ export default function UserPortal() {
       }
     } catch (e) {
       setMessages(prev => [...prev, {
-        role: 'assistant', content: `Cannot reach the API server. Is it running on port 5000?`,
+        role: 'assistant', content: e.message || 'Cannot reach the AI server.',
         ts: new Date().toISOString(),
       }])
     } finally {
@@ -94,10 +94,10 @@ export default function UserPortal() {
   }
 
   const handleFeedback = async (msgIdx, vote) => {
-    if (feedbacks[msgIdx]) return // already voted
+    if (feedbacks[msgIdx]) return
     setFeedbacks(f => ({ ...f, [msgIdx]: vote }))
     try {
-      await fetch('/api/feedback', {
+      await apiFetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vote }),
@@ -105,13 +105,16 @@ export default function UserPortal() {
     } catch (_) {}
   }
 
-  const handleClear = async () => {
+  const handleNewChat = async () => {
     setClearing(true)
     try {
-      await fetch('/api/clear', { method: 'POST' })
-      setMessages([])
-      setFeedbacks({})
-      sessionStorage.removeItem('chat_messages') // clear persisted messages too
+      const res = await apiFetch('/api/clear', { method: 'POST' })
+      const data = await res.json()
+      if (data.ok) {
+        setMessages([])
+        setFeedbacks({})
+        if (data.conversation_id) setConversationId(data.conversation_id)
+      }
     } catch (_) {}
     setClearing(false)
   }
@@ -179,27 +182,26 @@ export default function UserPortal() {
           </h2>
         </div>
         <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem', letterSpacing: 2, textTransform: 'uppercase' }}>
-          Context-Aware • 50+ Languages • Zero Hallucination
+          Welcome back, {user?.name || 'Customer'} • Authenticated RAG Engine
         </div>
 
-        {/* Clear button */}
+        {/* New Session button */}
         <motion.button
-          whileHover={{ scale: 1.05, background: 'rgba(255,68,102,0.15)' }}
+          whileHover={{ scale: 1.05, background: 'rgba(0,255,247,0.15)', borderColor: 'var(--cyan)' }}
           whileTap={{ scale: 0.95 }}
-          onClick={handleClear}
-          disabled={clearing || !messages.length}
+          onClick={handleNewChat}
+          disabled={clearing}
           style={{
             position: 'absolute', top: '50%', right: 20, transform: 'translateY(-50%)',
-            background: 'rgba(255,68,102,0.05)',
-            border: '1px solid rgba(255,68,102,0.2)',
-            borderRadius: 8, padding: '8px 16px',
-            color: 'var(--red)', cursor: 'pointer', fontSize: '0.8rem',
+            background: 'rgba(0,255,247,0.08)',
+            border: '1px solid rgba(0,255,247,0.3)',
+            borderRadius: 10, padding: '8px 16px',
+            color: '#fff', cursor: 'pointer', fontSize: '0.82rem',
             display: 'flex', alignItems: 'center', gap: 6,
-            opacity: messages.length ? 1 : 0.4,
             transition: 'all 0.2s'
           }}
         >
-          <Trash2 size={14} /> {clearing ? 'Saving...' : 'Clear Session'}
+          <PlusCircle size={15} color="var(--cyan)" /> {clearing ? 'Saving...' : 'New Chat'}
         </motion.button>
       </motion.div>
 
@@ -218,33 +220,42 @@ export default function UserPortal() {
               style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 30, fontSize: '0.8rem' }}>
-                <Sparkles size={14} /> Suggested Questions
+                <Sparkles size={16} color="var(--purple)" /> Suggested Questions
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', maxWidth: 600 }}>
-                {SUGGESTED.map((s, i) => (
+
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: 16, width: '100%', maxWidth: 700,
+              }}>
+                {SUGGESTED.map((q, idx) => (
                   <motion.button
-                    key={s}
+                    key={q}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1, type: 'spring' }}
-                    whileHover={{ scale: 1.05, y: -4, boxShadow: '0 10px 20px rgba(0,255,247,0.1)', borderColor: 'rgba(0,255,247,0.4)' }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => sendMessage(s)}
+                    transition={{ delay: idx * 0.05 }}
+                    whileHover={{ scale: 1.02, translateY: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => sendMessage(q)}
                     style={{
-                      background: 'rgba(0,255,247,0.03)',
-                      border: '1px solid rgba(0,255,247,0.15)',
-                      borderRadius: 16,
-                      padding: '12px 20px',
-                      color: 'var(--cyan)',
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      transition: 'border-color 0.2s'
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      borderRadius: 16, padding: '16px 20px',
+                      color: 'var(--text-secondary)', textAlign: 'left',
+                      fontSize: '0.86rem', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      transition: 'border-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(0,255,247,0.3)'
+                      e.currentTarget.style.background = 'rgba(0,255,247,0.03)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.02)'
                     }}
                   >
-                    <MessageCircleQuestion size={16} /> {s}
+                    <span>{q}</span>
+                    <span style={{ color: 'var(--cyan)', opacity: 0.7 }}>&rarr;</span>
                   </motion.button>
                 ))}
               </div>
@@ -252,135 +263,82 @@ export default function UserPortal() {
           )}
         </AnimatePresence>
 
-        <AnimatePresence initial={false}>
-          {messages.map((msg, idx) =>
-            msg.role === 'user' ? (
-              <UserBubble key={idx} content={msg.content} ts={msg.ts} />
-            ) : (
-              <BotBubble
-                key={idx}
-                content={msg.content}
-                sources={msg.sources}
-                languageName={msg.language_name}
-                ts={msg.ts}
-                feedbackState={feedbacks[idx]}
-                onFeedback={(vote) => handleFeedback(idx, vote)}
-              />
-            )
-          )}
-        </AnimatePresence>
+        {/* Message stream */}
+        {messages.map((m, idx) => (
+          m.role === 'user' ? (
+            <UserBubble 
+              key={idx} 
+              content={m.content}
+              ts={m.ts}
+              message={m} 
+              userAvatar={user?.avatar || '👤'} 
+            />
+          ) : (
+            <BotBubble
+              key={idx}
+              content={m.content}
+              sources={m.sources}
+              languageName={m.language_name}
+              ts={m.ts}
+              message={m}
+              feedbackState={feedbacks[idx]}
+              onFeedback={(vote) => handleFeedback(idx, vote)}
+            />
+          )
+        ))}
 
-        <AnimatePresence>
-          {typing && <TypingIndicator key="typing" />}
-        </AnimatePresence>
-
-        <div ref={bottomRef} style={{ height: 20 }} />
+        {typing && <TypingIndicator />}
+        <div ref={bottomRef} style={{ height: 1 }} />
       </div>
 
-      {/* Input area */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        style={{
-          marginTop: 16,
-          background: 'rgba(10, 15, 30, 0.6)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(0,255,247,0.25)',
-          borderRadius: 24,
-          padding: '16px 24px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 12,
-          boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
-          position: 'relative',
-          zIndex: 10
-        }}
-      >
-        <motion.button
-          whileHover={{ scale: 1.1, color: 'var(--cyan)' }}
-          whileTap={{ scale: 0.9 }}
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', paddingBottom: 4 }}
-        >
-          <Paperclip size={20} />
-        </motion.button>
-
+      {/* Input bar */}
+      <div style={{
+        position: 'relative', marginTop: 14,
+        background: 'rgba(8, 12, 28, 0.75)',
+        backdropFilter: 'blur(16px)',
+        border: '1px solid rgba(0, 255, 247, 0.25)',
+        borderRadius: 24,
+        padding: '6px 8px 6px 20px',
+        display: 'flex', alignItems: 'center', gap: 12,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(0,255,247,0.05)',
+      }}>
         <textarea
           ref={inputRef}
+          rows={1}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask anything about products, policies, shipping, returns..."
+          placeholder="Ask anything about company policies, orders, or support..."
           disabled={typing}
-          rows={1}
           style={{
             flex: 1, background: 'transparent', border: 'none', outline: 'none',
-            color: '#fff', fontFamily: 'var(--font-body)',
-            fontSize: '1rem', resize: 'none', lineHeight: 1.5,
-            maxHeight: 150, overflowY: 'auto',
-            minHeight: 24,
-            padding: '2px 0'
-          }}
-          onInput={(e) => {
-            e.target.style.height = 'auto'
-            e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'
+            color: '#fff', fontSize: '0.94rem', resize: 'none',
+            lineHeight: 1.5, maxHeight: 120, fontFamily: 'inherit',
+            padding: '8px 0',
           }}
         />
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
-          {/* Char count */}
-          {input.length > 0 && (
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{input.length}</span>
-          )}
-
-          {/* Voice button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <motion.button
-            whileHover={{ scale: 1.1, background: 'rgba(191,0,255,0.15)' }}
-            whileTap={{ scale: 0.9 }}
-            style={{
-              background: 'rgba(191,0,255,0.08)',
-              border: '1px solid rgba(191,0,255,0.2)',
-              borderRadius: '50%',
-              width: 36, height: 36,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--purple)', cursor: 'pointer', transition: 'all 0.2s'
-            }}
-            data-tooltip="Voice Input"
-          >
-            <Mic size={18} />
-          </motion.button>
-
-          {/* Send button */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
             onClick={() => sendMessage()}
             disabled={!input.trim() || typing}
             style={{
+              width: 44, height: 44, borderRadius: '50%',
               background: input.trim() && !typing
-                ? 'linear-gradient(135deg, var(--cyan), #00aacc, var(--purple))'
+                ? 'linear-gradient(135deg, var(--cyan), var(--purple))'
                 : 'rgba(255,255,255,0.05)',
               border: 'none',
-              borderRadius: '50%',
-              width: 38, height: 38,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: input.trim() && !typing ? 'pointer' : 'default',
-              color: input.trim() && !typing ? '#000' : 'var(--text-dim)',
-              transition: 'all 0.3s ease',
-              boxShadow: input.trim() && !typing ? '0 0 20px rgba(0,255,247,0.4)' : 'none',
+              cursor: input.trim() && !typing ? 'pointer' : 'not-allowed',
+              boxShadow: input.trim() && !typing ? '0 0 16px rgba(0,255,247,0.4)' : 'none',
+              transition: 'all 0.2s',
             }}
           >
-            {typing ? <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /> : <Send size={18} style={{ marginLeft: 2 }} />}
+            <Send size={18} color={input.trim() && !typing ? '#000' : 'var(--text-dim)'} />
           </motion.button>
         </div>
-      </motion.div>
-
-      <div style={{
-        textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-dim)',
-        marginTop: 12, letterSpacing: 0.5
-      }}>
-        Press <kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: 6, fontSize: '0.85em', border: '1px solid rgba(255,255,255,0.1)' }}>Enter</kbd> to send • 
-        <kbd style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: 6, fontSize: '0.85em', marginLeft: 6, border: '1px solid rgba(255,255,255,0.1)' }}>Shift+Enter</kbd> for new line
       </div>
     </motion.div>
   )

@@ -1,8 +1,10 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, RefreshCw, Trash2, AlertTriangle, Database, FileText, ChevronDown, ChevronUp, Layers, Book, UploadCloud, CheckCircle, XCircle } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 export default function Sidebar({ open, kbStatus, onStatusRefresh }) {
+  const { apiFetch } = useAuth()
   const [uploading, setUploading] = useState(false)
   const [uploadResults, setUploadResults] = useState([])
   const [loadingSample, setLoadingSample] = useState(false)
@@ -18,7 +20,7 @@ export default function Sidebar({ open, kbStatus, onStatusRefresh }) {
     const fd = new FormData()
     Array.from(files).forEach(f => fd.append('files', f))
     try {
-      const r = await fetch('/api/upload', { method: 'POST', body: fd })
+      const r = await apiFetch('/api/upload', { method: 'POST', body: fd })
       const d = await r.json()
       if (d.ok) setUploadResults(d.results)
     } catch (e) {
@@ -32,7 +34,7 @@ export default function Sidebar({ open, kbStatus, onStatusRefresh }) {
   const handleLoadSample = async () => {
     setLoadingSample(true)
     try {
-      const r = await fetch('/api/load-sample', { method: 'POST' })
+      const r = await apiFetch('/api/load-sample', { method: 'POST' })
       const d = await r.json()
       if (d.ok) onStatusRefresh()
     } catch (_) {}
@@ -43,7 +45,7 @@ export default function Sidebar({ open, kbStatus, onStatusRefresh }) {
     if (!window.confirm('Reset entire knowledge base? This cannot be undone.')) return
     setResetting(true)
     try {
-      await fetch('/api/reset-kb', { method: 'POST' })
+      await apiFetch('/api/reset-kb', { method: 'POST' })
       onStatusRefresh()
     } catch (_) {}
     setResetting(false)

@@ -2,7 +2,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
 import { ChevronDown, ExternalLink, User, Bot, ThumbsUp, ThumbsDown, Globe, Copy, Check, Volume2, RefreshCcw } from 'lucide-react'
 
-export function UserBubble({ content, ts }) {
+export function UserBubble({ content, ts, message, userAvatar }) {
+  const actualContent = content ?? message?.content ?? ''
+  const actualTs = ts ?? message?.ts
+  const actualAvatar = userAvatar || message?.avatar
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 40, scale: 0.95 }}
@@ -22,11 +26,11 @@ export function UserBubble({ content, ts }) {
           boxShadow: '0 8px 32px rgba(191,0,255,0.15)',
           backdropFilter: 'blur(8px)',
         }}>
-          {content}
+          {actualContent}
         </div>
-        {ts && (
+        {actualTs && (
           <div style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: 6, paddingRight: 8, letterSpacing: 1 }}>
-            {new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {new Date(actualTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         )}
       </div>
@@ -36,19 +40,35 @@ export function UserBubble({ content, ts }) {
         border: '1px solid rgba(191,0,255,0.4)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: '0 0 15px rgba(191,0,255,0.2)',
+        fontSize: '1rem',
       }}>
-        <User size={18} color="#fff" />
+        {actualAvatar ? <span>{actualAvatar}</span> : <User size={18} color="#fff" />}
       </div>
     </motion.div>
   )
 }
 
-export function BotBubble({ content, sources, languageName, ts, onFeedback, feedbackState }) {
+export function BotBubble({ 
+  content, 
+  sources, 
+  languageName, 
+  ts, 
+  onFeedback, 
+  feedbackState,
+  message,
+  feedback 
+}) {
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  const actualContent = content ?? message?.content ?? ''
+  const actualSources = sources ?? message?.sources ?? []
+  const actualLanguage = languageName ?? message?.language_name
+  const actualTs = ts ?? message?.ts
+  const actualFeedback = feedbackState ?? feedback
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(content)
+    navigator.clipboard.writeText(actualContent)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -97,7 +117,7 @@ export function BotBubble({ content, sources, languageName, ts, onFeedback, feed
               background: 'linear-gradient(90deg, transparent, rgba(0,255,247,0.6), transparent)',
             }}
           />
-          <div style={{ whiteSpace: 'pre-wrap', position: 'relative', zIndex: 1 }}>{content}</div>
+          <div style={{ whiteSpace: 'pre-wrap', position: 'relative', zIndex: 1 }}>{actualContent}</div>
         </div>
 
         {/* Action & Meta Row */}
@@ -106,12 +126,12 @@ export function BotBubble({ content, sources, languageName, ts, onFeedback, feed
           marginTop: 8, flexWrap: 'wrap', gap: 10, paddingLeft: 8
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {ts && (
+            {actualTs && (
               <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', letterSpacing: 1 }}>
-                {new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {new Date(actualTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
-            {languageName && (
+            {actualLanguage && (
               <span style={{
                 display: 'flex', alignItems: 'center', gap: 4,
                 fontSize: '0.7rem', color: 'var(--cyan)',
@@ -119,7 +139,7 @@ export function BotBubble({ content, sources, languageName, ts, onFeedback, feed
                 border: '1px solid rgba(0,255,247,0.15)',
                 borderRadius: 20, padding: '2px 10px',
               }}>
-                <Globe size={10} /> {languageName}
+                <Globe size={10} /> {actualLanguage}
               </span>
             )}
           </div>
@@ -128,11 +148,15 @@ export function BotBubble({ content, sources, languageName, ts, onFeedback, feed
             {/* Utility Actions */}
             <div style={{ display: 'flex', gap: 4, marginRight: 8, borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: 8 }}>
               <motion.button whileHover={{ scale: 1.1, color: 'var(--cyan)' }} whileTap={{ scale: 0.9 }} onClick={handleCopy}
-                style={{ background: 'none', border: 'none', color: copied ? 'var(--cyan)' : 'var(--text-muted)', cursor: 'pointer', padding: 4 }}>
+                style={{ background: 'none', border: 'none', color: copied ? 'var(--cyan)' : 'var(--text-muted)', cursor: 'pointer', padding: 4 }}
+                title="Copy response"
+              >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
               </motion.button>
               <motion.button whileHover={{ scale: 1.1, color: 'var(--purple)' }} whileTap={{ scale: 0.9 }}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}>
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 4 }}
+                title="Read aloud"
+              >
                 <Volume2 size={14} />
               </motion.button>
             </div>
@@ -143,24 +167,26 @@ export function BotBubble({ content, sources, languageName, ts, onFeedback, feed
                 <motion.button
                   whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => onFeedback('up')}
                   style={{
-                    background: feedbackState === 'up' ? 'rgba(0,255,136,0.15)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${feedbackState === 'up' ? 'rgba(0,255,136,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                    background: actualFeedback === 'up' ? 'rgba(0,255,136,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${actualFeedback === 'up' ? 'rgba(0,255,136,0.4)' : 'rgba(255,255,255,0.08)'}`,
                     borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
-                    color: feedbackState === 'up' ? '#00ff88' : 'var(--text-muted)',
+                    color: actualFeedback === 'up' ? '#00ff88' : 'var(--text-muted)',
                     transition: 'all 0.2s', display: 'flex', alignItems: 'center',
                   }}
+                  title="Helpful"
                 >
                   <ThumbsUp size={14} />
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => onFeedback('down')}
                   style={{
-                    background: feedbackState === 'down' ? 'rgba(255,68,102,0.15)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${feedbackState === 'down' ? 'rgba(255,68,102,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                    background: actualFeedback === 'down' ? 'rgba(255,68,102,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${actualFeedback === 'down' ? 'rgba(255,68,102,0.4)' : 'rgba(255,255,255,0.08)'}`,
                     borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
-                    color: feedbackState === 'down' ? '#ff4466' : 'var(--text-muted)',
+                    color: actualFeedback === 'down' ? '#ff4466' : 'var(--text-muted)',
                     transition: 'all 0.2s', display: 'flex', alignItems: 'center',
                   }}
+                  title="Not helpful"
                 >
                   <ThumbsDown size={14} />
                 </motion.button>
@@ -170,7 +196,7 @@ export function BotBubble({ content, sources, languageName, ts, onFeedback, feed
         </div>
 
         {/* Sources Accordion */}
-        {sources?.length > 0 && (
+        {actualSources?.length > 0 && (
           <motion.div style={{ marginTop: 12 }}>
             <motion.button
               whileHover={{ background: 'rgba(0,255,247,0.08)' }}
@@ -185,7 +211,7 @@ export function BotBubble({ content, sources, languageName, ts, onFeedback, feed
               }}
             >
               <ExternalLink size={14} />
-              View {sources.length} Cited Source{sources.length > 1 ? 's' : ''}
+              View {actualSources.length} Cited Source{actualSources.length > 1 ? 's' : ''}
               <motion.span animate={{ rotate: sourcesOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
                 <ChevronDown size={14} />
               </motion.span>

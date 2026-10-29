@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Clock, RotateCcw, ChevronDown, ChevronUp, MessageSquare, Save } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Clock, RotateCcw, ChevronDown, MessageSquare, Plus, Trash2 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const PAGE_VARIANTS = {
   initial: { opacity: 0, x: 30 },
@@ -9,47 +11,47 @@ const PAGE_VARIANTS = {
 }
 
 export default function History() {
+  const { apiFetch, user } = useAuth()
+  const navigate = useNavigate()
+
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(null)
   const [restoring, setRestoring] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [deleting, setDeleting] = useState(null)
 
   const fetchHistory = async () => {
     setLoading(true)
     try {
-      const r = await fetch('/api/history')
+      const r = await apiFetch('/api/history')
       const d = await r.json()
-      if (d.ok) setConversations(d.conversations)
+      if (d.ok) setConversations(d.conversations || [])
     } catch (_) {}
     setLoading(false)
   }
 
-  useEffect(() => { fetchHistory() }, [])
+  useEffect(() => { fetchHistory() }, [apiFetch])
 
-  const handleSaveCurrent = async () => {
-    setSaving(true)
-    try {
-      await fetch('/api/clear', { method: 'POST' })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-      fetchHistory()
-    } catch (_) {}
-    setSaving(false)
+  const handleRestore = (conv) => {
+    navigate('/chat', { state: { conversationId: conv.id } })
   }
 
-  const handleRestore = async (idx) => {
-    setRestoring(idx)
+  const handleDelete = async (convId, e) => {
+    e.stopPropagation()
+    if (!window.confirm('Delete this conversation history permanently?')) return
+    setDeleting(convId)
     try {
-      await fetch('/api/history/restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ index: idx }),
-      })
-      window.location.href = '/chat'
+      const res = await apiFetch(`/api/history/${convId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.ok) {
+        setConversations(prev => prev.filter(c => c.id !== convId))
+      }
     } catch (_) {}
-    setRestoring(null)
+    setDeleting(null)
+  }
+
+  const handleStartNewChat = () => {
+    navigate('/chat', { state: { conversationId: null } })
   }
 
   return (
@@ -63,23 +65,21 @@ export default function History() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
         <div>
-          <h2 className="section-head" style={{ marginBottom: 4, fontSize: '1.1rem' }}>
-            🕐 Conversation History
+          <h2 className="section-head" style={{ marginBottom: 4, fontSize: '1.2rem' }}>
+            🕐 {user?.name ? `${user.name}'s History` : 'Conversation History'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>
-            {conversations.length} saved session{conversations.length !== 1 ? 's' : ''}
+            {conversations.length} saved session{conversations.length !== 1 ? 's' : ''} stored in your account database
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={handleSaveCurrent}
-            disabled={saving}
-            className="btn btn-ghost btn-sm"
+            onClick={handleStartNewChat}
+            className="btn btn-primary btn-sm"
           >
-            {saving ? <div className="spinner" /> : saved ? '✅' : <Save size={14} />}
-            {saved ? 'Saved!' : 'Save Current Session'}
+            <Plus size={15} /> New Chat
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -107,27 +107,35 @@ export default function History() {
             transition={{ duration: 4, repeat: Infinity }}
             style={{ fontSize: '4rem', marginBottom: 20 }}
           >
-            🕐
+            💬
           </motion.div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', fontWeight: 600, marginBottom: 10 }}>
-            No conversations saved yet
+            No conversation sessions yet
           </div>
-          <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-            Chat and click "Save Current Session" or "Clear" to save sessions here
+          <div style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 20 }}>
+            Questions you ask in the User Portal will be preserved in your personal history.
           </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleStartNewChat}
+            className="btn btn-primary btn-sm"
+          >
+            Start First Chat
+          </motion.button>
         </motion.div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {conversations.map((conv, idx) => (
             <motion.div
-              key={idx}
+              key={conv.id || idx}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.06 }}
+              transition={{ delay: idx * 0.05 }}
               className="card"
               style={{
                 overflow: 'hidden',
-                border: expanded === idx ? '1px solid rgba(0,255,247,0.2)' : undefined,
+                border: expanded === idx ? '1px solid rgba(0,255,247,0.3)' : undefined,
               }}
             >
               {/* Conversation header row */}
@@ -149,10 +157,10 @@ export default function History() {
                   <MessageSquare size={18} color="var(--cyan)" />
                 </div>
 
-                {/* Title */}
+                {/* Title & metadata */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)',
+                    fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {conv.title}
@@ -172,13 +180,27 @@ export default function History() {
                   <motion.button
                     whileHover={{ scale: 1.08 }}
                     whileTap={{ scale: 0.92 }}
-                    onClick={(e) => { e.stopPropagation(); handleRestore(idx) }}
-                    disabled={restoring === idx}
+                    onClick={(e) => { e.stopPropagation(); handleRestore(conv) }}
                     className="btn btn-ghost btn-sm"
+                    style={{ gap: 6 }}
+                    title="Open in Workspace"
                   >
-                    {restoring === idx ? <div className="spinner" /> : <RotateCcw size={13} />}
-                    Restore
+                    <RotateCcw size={13} color="var(--cyan)" />
+                    Resume
                   </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.15, color: '#ff4466' }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => handleDelete(conv.id, e)}
+                    disabled={deleting === conv.id}
+                    className="btn btn-ghost btn-icon"
+                    style={{ padding: 6, color: 'var(--text-dim)' }}
+                    title="Delete Conversation"
+                  >
+                    <Trash2 size={14} />
+                  </motion.button>
+
                   <motion.div animate={{ rotate: expanded === idx ? 180 : 0 }} transition={{ duration: 0.25 }}>
                     <ChevronDown size={18} color="var(--text-muted)" />
                   </motion.div>

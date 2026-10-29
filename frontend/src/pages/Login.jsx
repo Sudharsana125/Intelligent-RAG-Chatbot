@@ -1,23 +1,51 @@
-import { useState } from 'react'
+import { useState, useId } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate, Link } from 'react-router-dom'
 import { 
   Lock, Mail, Sparkles, ArrowRight, Eye, EyeOff, 
-  ShieldCheck, Zap, ArrowLeft, AlertCircle, CheckCircle2, User, UserPlus
+  ShieldCheck, Zap, ArrowLeft, AlertCircle, CheckCircle2, User, UserPlus, KeyRound
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
-export default function Login({ onLogin }) {
-  const [mode, setMode] = useState('login') // 'login' | 'register'
+export default function Login() {
+  const [mode, setMode] = useState('login') // 'login' | 'register' | 'forgot'
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
-  const [isLoading, setIsLoading] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
+
+  const { login, register, resetPassword } = useAuth()
   const navigate = useNavigate()
+
+  // Calculate password strength
+  const getPasswordStrength = (pwd) => {
+    if (!pwd) return { score: 0, label: '', color: '' }
+    let score = 0
+    if (pwd.length >= 6) score += 1
+    if (pwd.length >= 8) score += 1
+    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 1
+    if (/\d/.test(pwd) || /[^A-Za-z0-9]/.test(pwd)) score += 1
+
+    if (score <= 1) return { score: 1, label: 'Weak', color: '#ff4466' }
+    if (score === 2) return { score: 2, label: 'Fair', color: '#ffaa00' }
+    if (score === 3) return { score: 3, label: 'Good', color: '#00bbd4' }
+    return { score: 4, label: 'Strong', color: '#00ff88' }
+  }
+
+  const pwdStrength = getPasswordStrength(password)
+
+  const handleFastFill = (fillEmail, fillPwd) => {
+    setMode('login')
+    setEmail(fillEmail)
+    setPassword(fillPwd)
+    setError('')
+    setSuccessMsg('')
+  }
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault()
@@ -25,16 +53,29 @@ export default function Login({ onLogin }) {
     setSuccessMsg('')
 
     if (mode === 'register') {
-      if (!name.trim()) {
-        setError('Please enter your full name.')
+      if (!name.trim() || name.trim().length < 2) {
+        setError('Please enter your full name (at least 2 characters).')
         return
       }
-      if (!email.trim() || !email.includes('@')) {
+      if (!email.trim() || !email.includes('@') || !email.includes('.')) {
         setError('Please enter a valid email address.')
         return
       }
       if (password.length < 6) {
-        setError('Password must be at least 6 characters.')
+        setError('Password must be at least 6 characters long.')
+        return
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.')
+        return
+      }
+    } else if (mode === 'forgot') {
+      if (!email.trim() || !email.includes('@')) {
+        setError('Please enter your registered email address.')
+        return
+      }
+      if (password.length < 6) {
+        setError('New password must be at least 6 characters long.')
         return
       }
       if (password !== confirmPassword) {
@@ -42,45 +83,32 @@ export default function Login({ onLogin }) {
         return
       }
     } else {
-      if (!email || !password) {
-        setError('Please enter both email and password.')
+      if (!email.trim() || !password) {
+        setError('Please enter both your email and password.')
         return
       }
     }
 
-    setIsLoading(true)
+    setLoading(true)
 
     try {
-      const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login'
-      const payload = mode === 'register' 
-        ? { name: name.trim(), email: email.trim(), password, role: 'Customer' }
-        : { email: email.trim(), password }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-
-      const data = await response.json()
-
-      if (data.ok) {
-        const authUser = {
-          ...data.user,
-          token: data.token
-        }
-        if (onLogin) {
-          onLogin(authUser, rememberMe)
-        }
+      if (mode === 'register') {
+        await register(name, email, password, 'Customer')
         navigate('/chat')
+      } else if (mode === 'forgot') {
+        const msg = await resetPassword(email, password)
+        setSuccessMsg(msg || 'Password updated! Please sign in with your new password.')
+        setMode('login')
+        setPassword('')
+        setConfirmPassword('')
       } else {
-        setError(data.error || 'Authentication failed. Please verify your details.')
+        await login(email, password, rememberMe)
+        navigate('/chat')
       }
     } catch (err) {
-      console.warn('Backend connection error:', err)
-      setError('Cannot connect to authentication service. Please ensure the backend is running.')
+      setError(err.message || 'Authentication error. Please try again.')
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
@@ -93,13 +121,13 @@ export default function Login({ onLogin }) {
       justifyContent: 'center',
       position: 'relative',
       overflow: 'hidden',
-      padding: '32px 16px',
+      padding: '36px 16px',
     }}>
-      {/* Background ambient lighting */}
+      {/* Background ambient lighting glow */}
       <motion.div
         animate={{
           scale: [1, 1.25, 1],
-          opacity: [0.25, 0.45, 0.25],
+          opacity: [0.22, 0.4, 0.22],
         }}
         transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
         style={{
@@ -139,15 +167,15 @@ export default function Login({ onLogin }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, type: 'spring', bounce: 0.3 }}
         style={{
-          background: 'rgba(8, 12, 24, 0.88)',
-          backdropFilter: 'blur(28px)',
-          WebkitBackdropFilter: 'blur(28px)',
-          border: '1px solid rgba(0, 255, 247, 0.22)',
+          background: 'rgba(8, 12, 24, 0.90)',
+          backdropFilter: 'blur(30px)',
+          WebkitBackdropFilter: 'blur(30px)',
+          border: '1px solid rgba(0, 255, 247, 0.24)',
           borderRadius: 24,
           padding: '36px 40px',
           width: '100%',
           maxWidth: 480,
-          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.65), 0 0 35px rgba(0, 255, 247, 0.08), inset 0 0 25px rgba(0, 255, 247, 0.04)',
+          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 255, 247, 0.09), inset 0 0 25px rgba(0, 255, 247, 0.04)',
           position: 'relative',
           zIndex: 1
         }}
@@ -212,10 +240,10 @@ export default function Login({ onLogin }) {
           </p>
         </div>
 
-        {/* Mode Selector Tabs (Sign In vs Create Account) */}
+        {/* Mode Selector Tabs (Sign In / Register / Reset) */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: mode === 'forgot' ? '1fr 1fr 1fr' : '1fr 1fr',
           background: 'rgba(255, 255, 255, 0.04)',
           borderRadius: 12,
           padding: 4,
@@ -226,13 +254,13 @@ export default function Login({ onLogin }) {
             type="button"
             onClick={() => { setMode('login'); setError(''); setSuccessMsg('') }}
             style={{
-              background: mode === 'login' ? 'linear-gradient(135deg, rgba(0,255,247,0.2), rgba(191,0,255,0.2))' : 'transparent',
-              border: mode === 'login' ? '1px solid rgba(0,255,247,0.4)' : 'none',
+              background: mode === 'login' ? 'linear-gradient(135deg, rgba(0,255,247,0.22), rgba(191,0,255,0.22))' : 'transparent',
+              border: mode === 'login' ? '1px solid rgba(0,255,247,0.45)' : 'none',
               borderRadius: 9,
-              padding: '9px 12px',
+              padding: '9px 10px',
               color: mode === 'login' ? '#fff' : 'var(--text-muted)',
               fontWeight: mode === 'login' ? 700 : 500,
-              fontSize: '0.86rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               display: 'flex',
@@ -241,7 +269,7 @@ export default function Login({ onLogin }) {
               gap: 6
             }}
           >
-            <ShieldCheck size={15} /> Customer Sign In
+            <ShieldCheck size={14} /> Sign In
           </button>
 
           <button
@@ -249,12 +277,12 @@ export default function Login({ onLogin }) {
             onClick={() => { setMode('register'); setError(''); setSuccessMsg('') }}
             style={{
               background: mode === 'register' ? 'linear-gradient(135deg, rgba(191,0,255,0.25), rgba(0,255,247,0.2))' : 'transparent',
-              border: mode === 'register' ? '1px solid rgba(191,0,255,0.4)' : 'none',
+              border: mode === 'register' ? '1px solid rgba(191,0,255,0.45)' : 'none',
               borderRadius: 9,
-              padding: '9px 12px',
+              padding: '9px 10px',
               color: mode === 'register' ? '#fff' : 'var(--text-muted)',
               fontWeight: mode === 'register' ? 700 : 500,
-              fontSize: '0.86rem',
+              fontSize: '0.84rem',
               cursor: 'pointer',
               transition: 'all 0.2s',
               display: 'flex',
@@ -263,11 +291,57 @@ export default function Login({ onLogin }) {
               gap: 6
             }}
           >
-            <UserPlus size={15} /> Create Account
+            <UserPlus size={14} /> Create Account
           </button>
+
+          {mode === 'forgot' && (
+            <button
+              type="button"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,170,0,0.25), rgba(0,255,247,0.15))',
+                border: '1px solid rgba(255,170,0,0.45)',
+                borderRadius: 9,
+                padding: '9px 10px',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: '0.84rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6
+              }}
+            >
+              <KeyRound size={14} /> Reset Key
+            </button>
+          )}
         </div>
 
-        {/* Error Notification */}
+        {/* Success Alert */}
+        <AnimatePresence>
+          {successMsg && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+              animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                background: 'rgba(0, 255, 136, 0.12)',
+                border: '1px solid rgba(0, 255, 136, 0.35)',
+                color: '#00ff88',
+                padding: '10px 14px',
+                borderRadius: 10,
+                fontSize: '0.85rem'
+              }}
+            >
+              <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
+              <span>{successMsg}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Error Alert */}
         <AnimatePresence>
           {error && (
             <motion.div
@@ -295,7 +369,7 @@ export default function Login({ onLogin }) {
         {/* Auth Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           
-          {/* Name Field (Register only) */}
+          {/* Full Name Field (Register only) */}
           {mode === 'register' && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -381,8 +455,13 @@ export default function Login({ onLogin }) {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Password {mode === 'register' && <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>(min 6 chars)</span>}
+                {mode === 'forgot' ? 'New Password' : 'Password'} {mode !== 'login' && <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>(min 6 chars)</span>}
               </label>
+              {mode === 'register' && password && (
+                <span style={{ fontSize: '0.74rem', fontWeight: 600, color: pwdStrength.color }}>
+                  {pwdStrength.label}
+                </span>
+              )}
             </div>
             <div style={{ position: 'relative' }}>
               <div style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 14, color: 'var(--text-dim)', pointerEvents: 'none' }}>
@@ -435,17 +514,35 @@ export default function Login({ onLogin }) {
                 {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
               </button>
             </div>
+
+            {/* Password strength progress bar (Register only) */}
+            {mode === 'register' && password && (
+              <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                {[1, 2, 3, 4].map(step => (
+                  <div
+                    key={step}
+                    style={{
+                      height: 3,
+                      flex: 1,
+                      borderRadius: 2,
+                      background: step <= pwdStrength.score ? pwdStrength.color : 'rgba(255,255,255,0.1)',
+                      transition: 'all 0.3s'
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Confirm Password (Register only) */}
-          {mode === 'register' && (
+          {/* Confirm Password (Register or Forgot only) */}
+          {(mode === 'register' || mode === 'forgot') && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25 }}
             >
               <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 500 }}>
-                Confirm Password
+                Confirm {mode === 'forgot' ? 'New ' : ''}Password
               </label>
               <div style={{ position: 'relative' }}>
                 <div style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 14, color: 'var(--text-dim)', pointerEvents: 'none' }}>
@@ -481,35 +578,45 @@ export default function Login({ onLogin }) {
             </motion.div>
           )}
 
-          {/* Options */}
+          {/* Options: Remember me & Forgot Password */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={e => setRememberMe(e.target.checked)}
-                style={{ accentColor: 'var(--cyan)', width: 15, height: 15, cursor: 'pointer' }}
-              />
-              Remember session
-            </label>
             {mode === 'login' && (
-              <span 
-                onClick={() => setError('Password reset instructions: Use admin@support.ai or create a new Customer account.')} 
-                style={{ color: 'var(--cyan)', cursor: 'pointer', fontSize: '0.82rem' }}
-              >
-                Forgot Key?
-              </span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  style={{ accentColor: 'var(--cyan)', width: 15, height: 15, cursor: 'pointer' }}
+                />
+                Remember session
+              </label>
             )}
+
+            {mode === 'login' ? (
+              <span 
+                onClick={() => { setMode('forgot'); setError(''); setSuccessMsg('') }} 
+                style={{ color: 'var(--cyan)', cursor: 'pointer', fontSize: '0.82rem', marginLeft: 'auto', textDecoration: 'underline' }}
+              >
+                Forgot Password?
+              </span>
+            ) : mode === 'forgot' ? (
+              <span 
+                onClick={() => { setMode('login'); setError(''); setSuccessMsg('') }} 
+                style={{ color: 'var(--cyan)', cursor: 'pointer', fontSize: '0.82rem', textDecoration: 'underline' }}
+              >
+                Back to Sign In
+              </span>
+            ) : null}
           </div>
 
           {/* Submit Button */}
           <motion.button
-            whileHover={isLoading ? {} : { scale: 1.02, boxShadow: '0 0 25px rgba(0, 255, 247, 0.4)' }}
-            whileTap={isLoading ? {} : { scale: 0.98 }}
+            whileHover={loading ? {} : { scale: 1.02, boxShadow: '0 0 25px rgba(0, 255, 247, 0.4)' }}
+            whileTap={loading ? {} : { scale: 0.98 }}
             type="submit"
-            disabled={isLoading}
+            disabled={loading}
             style={{
-              marginTop: 4,
+              marginTop: 6,
               background: 'linear-gradient(135deg, var(--cyan), #00bbd4, var(--purple))',
               border: 'none',
               borderRadius: 12,
@@ -517,7 +624,7 @@ export default function Login({ onLogin }) {
               color: '#000',
               fontSize: '0.96rem',
               fontWeight: 700,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -525,14 +632,18 @@ export default function Login({ onLogin }) {
               transition: 'all 0.25s ease'
             }}
           >
-            {isLoading ? (
+            {loading ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2, borderColor: '#000', borderTopColor: 'transparent' }} />
-                <span>Authenticating with Database...</span>
+                <span>Securing Connection...</span>
               </div>
             ) : mode === 'register' ? (
               <>
                 Create Customer Account <UserPlus size={18} />
+              </>
+            ) : mode === 'forgot' ? (
+              <>
+                Update & Reset Password <KeyRound size={18} />
               </>
             ) : (
               <>
@@ -541,6 +652,89 @@ export default function Login({ onLogin }) {
             )}
           </motion.button>
         </form>
+
+        {/* Demo Fast-Fill Cards */}
+        <div style={{
+          marginTop: 24,
+          paddingTop: 18,
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            fontSize: '0.74rem',
+            color: 'var(--text-dim)',
+            textTransform: 'uppercase',
+            letterSpacing: 1.5,
+            marginBottom: 10
+          }}>
+            <Zap size={13} color="var(--cyan)" /> Fast Fill Test Accounts
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.02, borderColor: 'var(--cyan)' }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleFastFill('customer@support.ai', 'customer123')}
+              style={{
+                background: 'rgba(0, 255, 247, 0.05)',
+                border: '1px solid rgba(0, 255, 247, 0.2)',
+                borderRadius: 10,
+                padding: '8px 8px',
+                color: 'var(--text-primary)',
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{ fontWeight: 600, color: 'var(--cyan)' }}>✨ Customer</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.66rem' }}>customer123</div>
+            </motion.button>
+
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.02, borderColor: 'var(--purple)' }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleFastFill('agent@support.ai', 'agent123')}
+              style={{
+                background: 'rgba(191, 0, 255, 0.05)',
+                border: '1px solid rgba(191, 0, 255, 0.2)',
+                borderRadius: 10,
+                padding: '8px 8px',
+                color: 'var(--text-primary)',
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{ fontWeight: 600, color: '#d980ff' }}>🛡️ Support Agent</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.66rem' }}>agent123</div>
+            </motion.button>
+
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.02, borderColor: '#00ff88' }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleFastFill('admin@support.ai', 'admin123')}
+              style={{
+                background: 'rgba(0, 255, 136, 0.05)',
+                border: '1px solid rgba(0, 255, 136, 0.2)',
+                borderRadius: 10,
+                padding: '8px 8px',
+                color: 'var(--text-primary)',
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{ fontWeight: 600, color: '#00ff88' }}>⚡ Admin Lead</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: '0.66rem' }}>admin123</div>
+            </motion.button>
+          </div>
+        </div>
 
       </motion.div>
     </div>
